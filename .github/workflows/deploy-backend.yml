@@ -1,0 +1,64 @@
+name: Deploy Backend to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mcp-server-python/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AZURE_WEBAPP_NAME: mcp-backend-api  # Change this to your App Service name
+  PYTHON_VERSION: '3.12'
+  WORKING_DIRECTORY: './mcp-server-python'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Create and start virtual environment
+      working-directory: ${{ env.WORKING_DIRECTORY }}
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+
+    - name: Install dependencies
+      working-directory: ${{ env.WORKING_DIRECTORY }}
+      run: |
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Create deployment package
+      working-directory: ${{ env.WORKING_DIRECTORY }}
+      run: |
+        # Remove unnecessary files to reduce deployment size
+        rm -rf .git .github tests __pycache__ *.pyc .env.example
+
+        # Create a zip file for deployment
+        zip -r ../deploy.zip . -x "*.git*" -x "*__pycache__*" -x "*.pyc"
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./deploy.zip
+
+    - name: Restart Azure Web App
+      uses: azure/cli@v2
+      with:
+        azcliversion: latest
+        inlineScript: |
+          az webapp restart --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }}
