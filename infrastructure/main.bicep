@@ -30,10 +30,10 @@ param jwtSecret string
 @description('MCP Gateway URL pools (comma-separated)')
 param mcpGatewayUrlPools string
 
-@description('Custom domain for backend API')
+@description('Custom domain for backend API (optional, configure after deployment)')
 param backendCustomDomain string = ''
 
-@description('Custom domain for frontend')
+@description('Custom domain for frontend (optional, configure after deployment)')
 param frontendCustomDomain string = ''
 
 // Variables
@@ -111,6 +111,18 @@ resource postgresFirewallAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewa
   }
 }
 
+// Application Insights for monitoring (must be before backendApp)
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: '${resourcePrefix}-insights'
+  location: location
+  tags: tags
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalytics.id
+  }
+}
+
 // App Service Plan (Linux)
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
   name: appServicePlanName
@@ -173,18 +185,6 @@ resource backendApp 'Microsoft.Web/sites@2023-01-01' = {
   }
 }
 
-// Application Insights for monitoring
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: '${resourcePrefix}-insights'
-  location: location
-  tags: tags
-  kind: 'web'
-  properties: {
-    Application_Type: 'web'
-    WorkspaceResourceId: logAnalytics.id
-  }
-}
-
 // Static Web App for Frontend
 resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   name: frontendAppName
@@ -208,7 +208,8 @@ output backendAppUrl string = 'https://${backendApp.properties.defaultHostName}'
 output frontendAppUrl string = 'https://${staticWebApp.properties.defaultHostname}'
 output postgresServerFqdn string = postgresServer.properties.fullyQualifiedDomainName
 output postgresDatabaseName string = postgresDatabaseName
-output staticWebAppDeploymentToken string = staticWebApp.listSecrets().properties.apiKey
 output backendAppName string = backendApp.name
 output frontendAppName string = staticWebApp.name
 output resourceGroupName string = resourceGroup().name
+output backendCustomDomainConfigured string = backendCustomDomain != '' ? 'https://${backendCustomDomain}' : 'Not configured'
+output frontendCustomDomainConfigured string = frontendCustomDomain != '' ? 'https://${frontendCustomDomain}' : 'Not configured'

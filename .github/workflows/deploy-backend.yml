@@ -10,7 +10,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  AZURE_WEBAPP_NAME: mcp-backend-api  # Change this to your App Service name
+  AZURE_WEBAPP_NAME: screener2019-mcp-dev-backend  # Your Azure App Service name
   PYTHON_VERSION: '3.12'
   WORKING_DIRECTORY: './mcp-server-python'
 

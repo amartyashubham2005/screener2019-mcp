@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+*.env
+
+# Database
+*.db
+*.sqlite
+
+# Azure deployment
+infrastructure/deployment-outputs-*.txt
+!infrastructure/deployment-outputs-latest.txt
+publish-profile.xml
+*.publishsettings
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node modules (for frontend)
+node_modules/
+dist/
+build/
+
+# Auth tokens
+.auth.ccg
+.claude
