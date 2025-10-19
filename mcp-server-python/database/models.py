@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, DateTime, Text, ForeignKey, ARRAY
+from sqlalchemy import String, DateTime, Text, ForeignKey, ARRAY, BigInteger, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
@@ -113,3 +113,43 @@ class MCPServer(Base):
     
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="mcp_servers")
+
+
+class Log(Base):
+    __tablename__ = "logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
+    source_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sources.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+    ts: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    level: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    operation: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    method: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    correlation_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    elapsed_sec: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    log_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    # Relationships
+    user: Mapped[Optional["User"]] = relationship("User")
+    source: Mapped[Optional["Source"]] = relationship("Source")

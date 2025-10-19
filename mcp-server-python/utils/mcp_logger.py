@@ -25,8 +25,11 @@ from contextvars import ContextVar
 from datetime import datetime
 import uuid
 
-# Context variable for correlation ID (tracks request across async operations)
+# Context variables for tracking request context across async operations
 correlation_id_var: ContextVar[str] = ContextVar('correlation_id', default='')
+user_id_var: ContextVar[Optional[str]] = ContextVar('user_id', default=None)
+source_id_var: ContextVar[Optional[str]] = ContextVar('source_id', default=None)
+db_session_var: ContextVar[Optional[Any]] = ContextVar('db_session', default=None)
 
 class MCPLogger:
     """
@@ -81,6 +84,36 @@ class MCPLogger:
         """Get current correlation ID from context."""
         return correlation_id_var.get() or "unknown"
 
+    @staticmethod
+    def set_user_id(user_id: Optional[str]) -> None:
+        """Set user ID for current request context."""
+        user_id_var.set(user_id)
+
+    @staticmethod
+    def get_user_id() -> Optional[str]:
+        """Get current user ID from context."""
+        return user_id_var.get()
+
+    @staticmethod
+    def set_source_id(source_id: Optional[str]) -> None:
+        """Set source ID for current request context."""
+        source_id_var.set(source_id)
+
+    @staticmethod
+    def get_source_id() -> Optional[str]:
+        """Get current source ID from context."""
+        return source_id_var.get()
+
+    @staticmethod
+    def set_db_session(db_session: Any) -> None:
+        """Set database session for current request context."""
+        db_session_var.set(db_session)
+
+    @staticmethod
+    def get_db_session() -> Optional[Any]:
+        """Get current database session from context."""
+        return db_session_var.get()
+
     def _format_log_message(
         self,
         operation: str,
@@ -128,6 +161,70 @@ class MCPLogger:
         kv_str = " ".join(kv_parts) if kv_parts else ""
         return f"[MCP:{operation}] {method} | {status} | {kv_str}"
 
+    async def _write_to_database(
+        self,
+        text: str,
+        level: str,
+        operation: Optional[str] = None,
+        method: Optional[str] = None,
+        status: Optional[str] = None,
+        elapsed_sec: Optional[float] = None,
+        **metadata
+    ) -> None:
+        """
+        Write log entry to database if session is available.
+
+        Args:
+            text: Log message text
+            level: Log level (INFO, WARNING, ERROR)
+            operation: Operation type
+            method: Method name
+            status: Status type
+            elapsed_sec: Elapsed time in seconds
+            **metadata: Additional metadata to store
+        """
+        try:
+            db_session = self.get_db_session()
+            if not db_session:
+                return
+
+            # Import here to avoid circular dependency
+            from repositories.log_repository import LogRepository
+
+            log_repo = LogRepository(db_session)
+
+            # Get user and source from context
+            user_id_str = self.get_user_id()
+            source_id_str = self.get_source_id()
+            correlation_id = self.get_correlation_id()
+
+            # Convert string IDs to UUID if present
+            user_id = uuid.UUID(user_id_str) if user_id_str else None
+            source_id = uuid.UUID(source_id_str) if source_id_str else None
+
+            # Create log entry
+            await log_repo.create_log(
+                text=text,
+                level=level,
+                ts=int(time.time() * 1000),  # Current time in epoch milliseconds
+                user_id=user_id,
+                source_id=source_id,
+                operation=operation,
+                method=method,
+                status=status,
+                correlation_id=correlation_id if correlation_id != "unknown" else None,
+                elapsed_sec=elapsed_sec,
+                metadata=metadata if metadata else None
+            )
+
+            # Commit the log entry
+            await db_session.commit()
+
+        except Exception as e:
+            # Don't let database logging errors break the application
+            # Just log to console
+            self.logger.warning(f"Failed to write log to database: {e}")
+
     def log_start(
         self,
         operation: str,
@@ -150,6 +247,22 @@ class MCPLogger:
 
         message = self._format_log_message(operation, method, self.START, **kwargs)
         self.logger.info(message)
+
+        # Write to database asynchronously (fire and forget)
+        try:
+            import asyncio
+            asyncio.create_task(
+                self._write_to_database(
+                    text=message,
+                    level="INFO",
+                    operation=operation,
+                    method=method,
+                    status=self.START,
+                    **kwargs
+                )
+            )
+        except Exception:
+            pass  # Ignore database logging errors
 
         return timer_key
 
@@ -187,13 +300,32 @@ class MCPLogger:
             **kwargs: Result details (results_count, status_code, etc.)
         """
         # Calculate elapsed time if timer exists
+        elapsed_sec = None
         if timer_key and timer_key in self.operation_timers:
             elapsed = time.monotonic() - self.operation_timers[timer_key]
-            kwargs['elapsed_sec'] = round(elapsed, 3)
+            elapsed_sec = round(elapsed, 3)
+            kwargs['elapsed_sec'] = elapsed_sec
             del self.operation_timers[timer_key]
 
         message = self._format_log_message(operation, method, self.SUCCESS, **kwargs)
         self.logger.info(message)
+
+        # Write to database asynchronously (fire and forget)
+        try:
+            import asyncio
+            asyncio.create_task(
+                self._write_to_database(
+                    text=message,
+                    level="INFO",
+                    operation=operation,
+                    method=method,
+                    status=self.SUCCESS,
+                    elapsed_sec=elapsed_sec,
+                    **kwargs
+                )
+            )
+        except Exception:
+            pass  # Ignore database logging errors
 
     def log_failed(
         self,
@@ -216,9 +348,11 @@ class MCPLogger:
             **kwargs: Additional error context
         """
         # Calculate elapsed time if timer exists
+        elapsed_sec = None
         if timer_key and timer_key in self.operation_timers:
             elapsed = time.monotonic() - self.operation_timers[timer_key]
-            kwargs['elapsed_sec'] = round(elapsed, 3)
+            elapsed_sec = round(elapsed, 3)
+            kwargs['elapsed_sec'] = elapsed_sec
             del self.operation_timers[timer_key]
 
         # Add error details
@@ -232,6 +366,23 @@ class MCPLogger:
             self.logger.error(message, exc_info=True)
         else:
             self.logger.error(message)
+
+        # Write to database asynchronously (fire and forget)
+        try:
+            import asyncio
+            asyncio.create_task(
+                self._write_to_database(
+                    text=message,
+                    level="ERROR",
+                    operation=operation,
+                    method=method,
+                    status=self.FAILED,
+                    elapsed_sec=elapsed_sec,
+                    **kwargs
+                )
+            )
+        except Exception:
+            pass  # Ignore database logging errors
 
     def log_warning(
         self,
