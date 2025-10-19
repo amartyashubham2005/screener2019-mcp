@@ -24,11 +24,12 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const config: RequestInit = {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true", // Skip ngrok warning page
         ...options.headers,
       },
       ...options,

@@ -7,6 +7,7 @@ load_dotenv()  # Load environment variables before importing anything else
 import logging
 import time
 import uuid
+import os
 
 from typing import Dict, List, Any
 
@@ -69,7 +70,7 @@ def add_cors_headers(response, request=None):
     origin = None
     if request:
         origin = request.headers.get("origin")
-    
+
     # List of allowed origins for development
     allowed_origins = [
         "http://localhost:3000",
@@ -80,15 +81,20 @@ def add_cors_headers(response, request=None):
         "http://127.0.0.1:8080",
         "https://jesterbot.com"
     ]
-    
+
+    # Add origins from environment variable if present
+    additional_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    if additional_origins:
+        allowed_origins.extend([o.strip() for o in additional_origins.split(",") if o.strip()])
+
     # If origin is in allowed list, use it; otherwise use first allowed origin
     if origin and origin in allowed_origins:
         response.headers["Access-Control-Allow-Origin"] = origin
     else:
         response.headers["Access-Control-Allow-Origin"] = allowed_origins[0]
-    
+
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Cookie"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Cookie, ngrok-skip-browser-warning"
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
@@ -188,7 +194,7 @@ def register_auth_routes(mcp: FastMCP):
                     value=access_token,
                     httponly=True,
                     secure=True,
-                    samesite="lax",  # Change to lax for cross-origin cookies
+                    samesite="none",  # Required for cross-origin cookies (localhost to ngrok)
                     max_age=24 * 60 * 60  # 24 hours
                 )
                 
@@ -205,8 +211,8 @@ def register_auth_routes(mcp: FastMCP):
         response.delete_cookie(
             key="access_token",
             httponly=True,
-            secure=False,  # Set to False for development
-            samesite="lax"  # Change to lax for cross-origin cookies
+            secure=True,
+            samesite="none"  # Required for cross-origin cookies (localhost to ngrok)
         )
         return add_cors_headers(response, request)
 
