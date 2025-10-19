@@ -7,6 +7,7 @@ import {
   GridIcon,
   HorizontaLDots,
   PlugInIcon,
+  DocsIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 import UserDropdown from "../components/header/UserDropdown";
@@ -28,6 +29,11 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "MCP Servers",
     path: "/mcp-servers",
+  },
+  {
+    icon: <DocsIcon />,
+    name: "Logs",
+    path: "/logs",
   },
   // {
   //   icon: <GridIcon />,

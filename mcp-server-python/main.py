@@ -743,8 +743,87 @@ def register_auth_routes(mcp: FastMCP):
                 return cors_error_response("MCP server not found", 404, request)
             
             await db.commit()
-            
+
             return cors_json_response({"message": "MCP server deleted successfully"}, 200, request)
+
+    # Logs endpoints
+
+    # GET /api/v1/logs - List logs for user with pagination
+    @mcp.custom_route("/api/v1/logs", methods=["GET"])
+    async def list_logs(request: Request):
+        email, error_response = await get_current_user_from_request(request)
+        if error_response:
+            return error_response
+
+        async for db in get_db():
+            user_repo = UserRepository(db)
+            user = await user_repo.get_by_email(email)
+            if not user:
+                return cors_error_response("User not found", 401, request)
+
+            from repositories.log_repository import LogRepository
+            log_repo = LogRepository(db)
+
+            # Parse query parameters
+            limit = int(request.query_params.get("limit", 10))
+            offset = int(request.query_params.get("offset", 0))
+            operation = request.query_params.get("operation", None)
+            level = request.query_params.get("level", None)
+            correlation_id = request.query_params.get("correlation_id", None)
+
+            # Get logs
+            logs = await log_repo.get_logs_by_user(
+                user_id=user.id,
+                limit=limit,
+                offset=offset,
+                operation=operation,
+                level=level,
+                correlation_id=correlation_id
+            )
+
+            logs_data = []
+            for log in logs:
+                logs_data.append({
+                    "id": str(log.id),
+                    "text": log.text,
+                    "ts": log.ts,
+                    "level": log.level,
+                    "operation": log.operation,
+                    "method": log.method,
+                    "status": log.status,
+                    "correlation_id": log.correlation_id,
+                    "elapsed_sec": log.elapsed_sec,
+                    "log_metadata": log.log_metadata,
+                    "created_at": log.created_at.isoformat()
+                })
+
+            return cors_json_response({
+                "logs": logs_data,
+                "limit": limit,
+                "offset": offset,
+                "has_more": len(logs) == limit
+            }, 200, request)
+
+    # GET /api/v1/logs/stats - Get operation statistics
+    @mcp.custom_route("/api/v1/logs/stats", methods=["GET"])
+    async def get_log_stats(request: Request):
+        email, error_response = await get_current_user_from_request(request)
+        if error_response:
+            return error_response
+
+        async for db in get_db():
+            user_repo = UserRepository(db)
+            user = await user_repo.get_by_email(email)
+            if not user:
+                return cors_error_response("User not found", 401, request)
+
+            from repositories.log_repository import LogRepository
+            log_repo = LogRepository(db)
+
+            hours = int(request.query_params.get("hours", 24))
+            stats = await log_repo.get_operation_stats(user_id=user.id, hours=hours)
+
+            return cors_json_response(stats, 200, request)
 
 async def get_box_handlers_for_current_domain() -> List[BoxHandler]:
     """
@@ -954,6 +1033,18 @@ def create_server() -> FastMCP:
         parsed_url = urllib.parse.urlparse(str(current_url))
         domain = parsed_url.netloc
 
+        # Try to get user from domain (for user_id in logs)
+        try:
+            async for db in get_db():
+                mcp_server_repo = MCPServerRepository(db)
+                servers = await mcp_server_repo.get_servers_by_endpoint(domain)
+                if servers:
+                    # Use the first server's user_id for logging context
+                    MCPLogger.set_user_id(str(servers[0].user_id))
+                break  # Only need one session
+        except Exception:
+            pass  # User ID is optional for logging
+
         timer_key = mcp_logger.log_start(
             MCPLogger.SEARCH,
             "aggregated_search",
@@ -1037,6 +1128,18 @@ def create_server() -> FastMCP:
         current_url = get_http_request().url
         parsed_url = urllib.parse.urlparse(str(current_url))
         domain = parsed_url.netloc
+
+        # Try to get user from domain (for user_id in logs)
+        try:
+            async for db in get_db():
+                mcp_server_repo = MCPServerRepository(db)
+                servers = await mcp_server_repo.get_servers_by_endpoint(domain)
+                if servers:
+                    # Use the first server's user_id for logging context
+                    MCPLogger.set_user_id(str(servers[0].user_id))
+                break  # Only need one session
+        except Exception:
+            pass  # User ID is optional for logging
 
         # Validate ID format
         if not id or "::" not in id:

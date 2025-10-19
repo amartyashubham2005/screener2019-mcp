@@ -10,6 +10,7 @@ import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Sources from "./pages/Sources";
 import McpServers from "./pages/McpServers";
+import Logs from "./pages/Logs";
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/sources" element={<Sources />} />
               <Route path="/mcp-servers" element={<McpServers />} />
+              <Route path="/logs" element={<Logs />} />
               <Route path="/profile" element={<UserProfiles />} />
             </Route>
           </Route>

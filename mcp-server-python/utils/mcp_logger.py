@@ -172,7 +172,7 @@ class MCPLogger:
         **metadata
     ) -> None:
         """
-        Write log entry to database if session is available.
+        Write log entry to database with its own session.
 
         Args:
             text: Log message text
@@ -184,16 +184,7 @@ class MCPLogger:
             **metadata: Additional metadata to store
         """
         try:
-            db_session = self.get_db_session()
-            if not db_session:
-                return
-
-            # Import here to avoid circular dependency
-            from repositories.log_repository import LogRepository
-
-            log_repo = LogRepository(db_session)
-
-            # Get user and source from context
+            # Get user and source from context (captured before this async task runs)
             user_id_str = self.get_user_id()
             source_id_str = self.get_source_id()
             correlation_id = self.get_correlation_id()
@@ -202,23 +193,32 @@ class MCPLogger:
             user_id = uuid.UUID(user_id_str) if user_id_str else None
             source_id = uuid.UUID(source_id_str) if source_id_str else None
 
-            # Create log entry
-            await log_repo.create_log(
-                text=text,
-                level=level,
-                ts=int(time.time() * 1000),  # Current time in epoch milliseconds
-                user_id=user_id,
-                source_id=source_id,
-                operation=operation,
-                method=method,
-                status=status,
-                correlation_id=correlation_id if correlation_id != "unknown" else None,
-                elapsed_sec=elapsed_sec,
-                metadata=metadata if metadata else None
-            )
+            # Import here to avoid circular dependency
+            from database.config import get_db
+            from repositories.log_repository import LogRepository
 
-            # Commit the log entry
-            await db_session.commit()
+            # Create a new database session for this log write
+            async for db in get_db():
+                log_repo = LogRepository(db)
+
+                # Create log entry
+                await log_repo.create_log(
+                    text=text,
+                    level=level,
+                    ts=int(time.time() * 1000),  # Current time in epoch milliseconds
+                    user_id=user_id,
+                    source_id=source_id,
+                    operation=operation,
+                    method=method,
+                    status=status,
+                    correlation_id=correlation_id if correlation_id != "unknown" else None,
+                    elapsed_sec=elapsed_sec,
+                    metadata=metadata if metadata else None
+                )
+
+                # Commit the log entry
+                await db.commit()
+                break  # Only need one session
 
         except Exception as e:
             # Don't let database logging errors break the application
