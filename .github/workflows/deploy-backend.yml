@@ -44,10 +44,19 @@ jobs:
       working-directory: ${{ env.WORKING_DIRECTORY }}
       run: |
         # Remove unnecessary files to reduce deployment size
-        rm -rf .git .github tests __pycache__ *.pyc .env.example
+        rm -rf venv .git .github tests __pycache__ *.pyc .env.example .env
 
-        # Create a zip file for deployment
-        zip -r ../deploy.zip . -x "*.git*" -x "*__pycache__*" -x "*.pyc"
+        # Ensure critical files are present
+        ls -la
+        echo "Checking for critical files..."
+        test -f main.py || { echo "ERROR: main.py not found"; exit 1; }
+        test -f requirements.txt || { echo "ERROR: requirements.txt not found"; exit 1; }
+        test -f startup.sh || { echo "ERROR: startup.sh not found"; exit 1; }
+        test -f .deployment || { echo "ERROR: .deployment not found"; exit 1; }
+
+        # Create a zip file for deployment (Oryx will extract and build)
+        cd ..
+        zip -r deploy.zip mcp-server-python/ -x "*.git*" -x "*__pycache__*" -x "*.pyc" -x "*/venv/*" -x "*/.env"
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
