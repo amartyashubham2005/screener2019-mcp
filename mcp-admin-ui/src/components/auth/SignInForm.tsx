@@ -28,7 +28,7 @@ const handleSignIn = async (e: React.FormEvent) => {
 
   try {
     const response = await authService.signIn({ email, password });
-  
+
     if (response.ok) {
       toast.success("Sign in successful!");
       login(response.data.user);
@@ -43,6 +43,36 @@ const handleSignIn = async (e: React.FormEvent) => {
     toast.error("Network error. Please check your connection.");
   } finally {
     setIsLoading(false);
+  }
+};
+
+// Handle Azure AD SSO login
+const handleAzureLogin = async () => {
+  try {
+    const response = await authService.initiateAzureLogin();
+
+    if (response.ok && response.data.authorization_url) {
+      // Extract state from authorization URL to store it locally
+      const url = new URL(response.data.authorization_url);
+      const state = url.searchParams.get('state');
+
+      if (state) {
+        // Store state in sessionStorage for validation after redirect
+        sessionStorage.setItem('azure_oauth_state', state);
+        console.log('[Azure SSO] Stored state in sessionStorage:', state);
+      } else {
+        console.error('[Azure SSO] No state parameter found in authorization URL');
+      }
+
+      console.log('[Azure SSO] Redirecting to:', response.data.authorization_url);
+      // Redirect to Azure AD authorization URL
+      window.location.href = response.data.authorization_url;
+    } else {
+      toast.error("Failed to initiate Azure login");
+    }
+  } catch (error) {
+    console.error("Azure login error:", error);
+    toast.error("Failed to connect to Azure. Please try again.");
   }
 };
   return (
@@ -106,6 +136,33 @@ const handleSignIn = async (e: React.FormEvent) => {
                   <Button className="w-full" size="sm" disabled={isLoading} >
                     Sign in
                   </Button>
+                </div>
+
+                {/* Divider */}
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                  </div>
+                  <div className="relative px-3 text-sm text-gray-500 bg-white dark:bg-gray-800 dark:text-gray-400">
+                    Or continue with
+                  </div>
+                </div>
+
+                {/* Azure AD SSO Button */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleAzureLogin}
+                    className="flex items-center justify-center w-full gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 23 23" fill="none">
+                      <path d="M0 0h10.931v10.931H0z" fill="#f25022"/>
+                      <path d="M12.069 0H23v10.931H12.069z" fill="#7fba00"/>
+                      <path d="M0 12.069h10.931V23H0z" fill="#00a4ef"/>
+                      <path d="M12.069 12.069H23V23H12.069z" fill="#ffb900"/>
+                    </svg>
+                    Sign in with Microsoft
+                  </button>
                 </div>
               </div>
             </form>

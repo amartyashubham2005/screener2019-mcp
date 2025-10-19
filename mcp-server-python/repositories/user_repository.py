@@ -77,3 +77,40 @@ class UserRepository:
         query = select(User).offset(skip).limit(limit)
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def get_user_by_azure_id(self, azure_id: str) -> Optional[User]:
+        """Get user by Azure AD ID."""
+        query = select(User).where(User.azure_id == azure_id)
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
+    async def create_azure_user(self, azure_id: str, email: str, full_name: Optional[str], tenant_id: str) -> User:
+        """Create a new user from Azure AD authentication."""
+        try:
+            user = User(
+                azure_id=azure_id,
+                email=email,
+                full_name=full_name,
+                azure_tenant_id=tenant_id,
+                auth_provider="azure",
+                hashed_password=None  # No password for Azure AD users
+            )
+            self.db.add(user)
+            await self.db.flush()
+            return user
+        except IntegrityError:
+            await self.db.rollback()
+            raise ValueError("User with this email or Azure ID already exists")
+
+    async def update_azure_user(self, user_id: uuid.UUID, full_name: Optional[str] = None) -> bool:
+        """Update Azure AD user information."""
+        update_data = {}
+        if full_name is not None:
+            update_data["full_name"] = full_name
+
+        if not update_data:
+            return False
+
+        query = update(User).where(User.id == user_id).values(**update_data)
+        result = await self.db.execute(query)
+        return result.rowcount > 0

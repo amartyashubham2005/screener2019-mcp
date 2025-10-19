@@ -15,8 +15,14 @@ interface AuthResponse {
     id: string;
     email: string;
     full_name: string;
+    auth_provider?: string;
   };
-  message: string;
+  message?: string;
+  access_token?: string;
+}
+
+interface AzureLoginResponse {
+  authorization_url: string;
 }
 
 export const authService = {
@@ -30,5 +36,13 @@ export const authService = {
 
   async signOut() {
     return api.post<AuthResponse>("/api/v1/signout");
+  },
+
+  async initiateAzureLogin() {
+    return api.get<AzureLoginResponse>("/api/v1/auth/azure/login");
+  },
+
+  async getCurrentUser() {
+    return api.get<AuthResponse["user"]>("/api/v1/me");
   },
 };

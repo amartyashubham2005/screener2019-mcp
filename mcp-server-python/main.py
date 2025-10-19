@@ -210,6 +210,146 @@ def register_auth_routes(mcp: FastMCP):
         )
         return add_cors_headers(response, request)
 
+    # Azure AD Authentication Endpoints
+
+    # Azure AD Login - Initiate OAuth flow
+    @mcp.custom_route("/api/v1/auth/azure/login", methods=["GET"])
+    async def azure_login(request: Request):
+        """Initiate Azure AD OAuth 2.0 flow."""
+        from auth.azure_ad import AzureADService
+        import secrets
+
+        try:
+            # Validate Azure AD configuration
+            if not AzureADService.validate_config():
+                return cors_error_response("Azure AD authentication is not configured", 500, request)
+
+            # Generate CSRF state token
+            state = secrets.token_urlsafe(32)
+
+            # Get authorization URL
+            auth_url = AzureADService.get_authorization_url(state)
+
+            # Note: State is now validated on the frontend using sessionStorage
+            # No need to set a cookie here anymore
+            response = JSONResponse({"authorization_url": auth_url})
+            return add_cors_headers(response, request)
+
+        except Exception as e:
+            print(f"Error initiating Azure AD login: {e}")
+            return cors_error_response(str(e), 500, request)
+
+    # Azure AD Callback - Handle OAuth callback
+    @mcp.custom_route("/api/v1/auth/azure/callback", methods=["GET"])
+    async def azure_callback(request: Request):
+        """Handle Azure AD OAuth 2.0 callback."""
+        from auth.azure_ad import AzureADService, AZURE_TENANT_ID
+
+        try:
+            # Extract code and state from query parameters
+            code = request.query_params.get("code")
+            state = request.query_params.get("state")
+            error = request.query_params.get("error")
+
+            # Check for OAuth errors
+            if error:
+                error_description = request.query_params.get("error_description", error)
+                return cors_error_response(f"Azure AD error: {error_description}", 401, request)
+
+            if not code or not state:
+                return cors_error_response("Missing code or state parameter", 400, request)
+
+            # Note: State validation is now handled on the frontend using sessionStorage
+            # This is more reliable for SPA OAuth flows where cookies can be lost across redirects
+
+            # Exchange code for token
+            token_response = await AzureADService.exchange_code_for_token(code)
+            if not token_response:
+                return cors_error_response("Failed to exchange code for token", 401, request)
+
+            access_token = token_response.get("access_token")
+            if not access_token:
+                return cors_error_response("No access token received", 401, request)
+
+            # Get user info from Microsoft Graph
+            user_info = await AzureADService.get_user_info(access_token)
+            if not user_info:
+                return cors_error_response("Failed to retrieve user information", 401, request)
+
+            # Check if user exists or create new user
+            async for db in get_db():
+                user_repo = UserRepository(db)
+
+                azure_id = user_info.get("azure_id")
+                email = user_info.get("email")
+                full_name = user_info.get("full_name")
+
+                if not azure_id or not email:
+                    return cors_error_response("Incomplete user information from Azure AD", 401, request)
+
+                # Try to find user by Azure ID
+                user = await user_repo.get_user_by_azure_id(azure_id)
+
+                if not user:
+                    # Try to find by email (in case user signed up with email first)
+                    user = await user_repo.get_by_email(email)
+
+                    if user:
+                        # Update existing email user with Azure AD info
+                        # This links an existing email/password account with Azure AD
+                        user.azure_id = azure_id
+                        user.azure_tenant_id = AZURE_TENANT_ID
+                        user.full_name = full_name
+                        user.auth_provider = "azure"
+                    else:
+                        # Create new Azure AD user
+                        user = await user_repo.create_azure_user(
+                            azure_id=azure_id,
+                            email=email,
+                            full_name=full_name,
+                            tenant_id=AZURE_TENANT_ID
+                        )
+                else:
+                    # Update user info if needed
+                    if user.full_name != full_name:
+                        await user_repo.update_azure_user(user.id, full_name=full_name)
+
+                # Commit the transaction
+                await db.commit()
+
+                # Create JWT access token
+                access_token_jwt = AuthUtils.create_access_token(user.email)
+
+                # Create response with token
+                response = JSONResponse({
+                    "access_token": access_token_jwt,
+                    "token_type": "bearer",
+                    "user": {
+                        "id": str(user.id),
+                        "email": user.email,
+                        "full_name": user.full_name or "",
+                        "auth_provider": user.auth_provider
+                    }
+                })
+
+                # Set HTTP-only cookie
+                response.set_cookie(
+                    key="access_token",
+                    value=access_token_jwt,
+                    httponly=True,
+                    secure=True,  # Required when samesite="none"
+                    samesite="none",  # Required for cross-origin cookies (Azure OAuth redirect)
+                    max_age=24 * 60 * 60  # 24 hours
+                )
+
+                return add_cors_headers(response, request)
+
+        except Exception as e:
+            print(f"Error in Azure AD callback: {e}")
+            import traceback
+            traceback.print_exc()
+            return cors_error_response(str(e), 500, request)
+
     # Helper function to get current user from request
     async def get_current_user_from_request(request: Request):
         """Extract and validate user from request cookies. Returns email or error response."""
@@ -235,17 +375,19 @@ def register_auth_routes(mcp: FastMCP):
         email, error_response = await get_current_user_from_request(request)
         if error_response:
             return error_response
-        
+
         # Get user from database with proper session management
         async for db in get_db():
             user_repo = UserRepository(db)
             user = await user_repo.get_by_email(email)
             if not user:
                 return cors_error_response("User not found", 401, request)
-            
+
             response = JSONResponse({
                 "id": str(user.id),
                 "email": user.email,
+                "full_name": user.full_name or "",
+                "auth_provider": user.auth_provider,
                 "created_at": user.created_at.isoformat(),
                 "updated_at": user.updated_at.isoformat()
             })
