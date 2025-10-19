@@ -26,8 +26,16 @@ from repositories.mcp_server_repository import MCPServerRepository
 from repositories.source_repository import SourceRepository
 
 import urllib.parse
-logging.basicConfig(level=logging.INFO)
+from utils.mcp_logger import get_mcp_logger, configure_mcp_logging, MCPLogger
+
+# Configure MCP logging with timestamps
+configure_mcp_logging(level=logging.INFO, include_timestamp=True)
+
+# Legacy logger for backwards compatibility
 logger = logging.getLogger(__name__)
+
+# Structured MCP logger
+mcp_logger = get_mcp_logger(__name__)
 
 SERVER_INSTRUCTIONS = """
 This MCP server exposes `search` and `fetch` via pluggable handlers.
@@ -938,60 +946,177 @@ def create_server() -> FastMCP:
         Aggregated search across all registered handlers.
         Returns: {"results": [{"id","title","text","url"}]}
         """
-        print("search get_http_request().url", get_http_request().url)
+        # Set correlation ID for this request
+        correlation_id = MCPLogger.set_correlation_id()
 
-        # Get dynamic handlers
-        box_handlers = await get_box_handlers_for_current_domain()
-        snowflake_handlers = await get_snowflake_handlers_for_current_domain()
-        outlook_handlers = await get_outlook_handlers_for_current_domain()
-        
-        # Combine all dynamic handlers
-        all_handlers = [
-            *box_handlers,       # Dynamic Box handlers
-            *snowflake_handlers, # Dynamic Snowflake handlers
-            *outlook_handlers,   # Dynamic Outlook handlers
-        ]
+        # Get current domain
+        current_url = get_http_request().url
+        parsed_url = urllib.parse.urlparse(str(current_url))
+        domain = parsed_url.netloc
 
-        all_results: List[Dict[str, Any]] = []
-        for h in all_handlers:
-            try:
-                results = await h.search(query=query, top=10)
-                all_results.extend(results)
-            except Exception as e:
-                logger.warning(f"[SEARCH] handler={h.name} failed: {e}")
-        logger.info(f"[SEARCH] total results={len(all_results)}")
-        return {"results": all_results}
+        timer_key = mcp_logger.log_start(
+            MCPLogger.SEARCH,
+            "aggregated_search",
+            query=query,
+            domain=domain,
+            correlation_id=correlation_id
+        )
+
+        try:
+            # Get dynamic handlers
+            box_handlers = await get_box_handlers_for_current_domain()
+            snowflake_handlers = await get_snowflake_handlers_for_current_domain()
+            outlook_handlers = await get_outlook_handlers_for_current_domain()
+
+            # Combine all dynamic handlers
+            all_handlers = [
+                *box_handlers,       # Dynamic Box handlers
+                *snowflake_handlers, # Dynamic Snowflake handlers
+                *outlook_handlers,   # Dynamic Outlook handlers
+            ]
+
+            mcp_logger.log_progress(
+                MCPLogger.SEARCH,
+                "aggregated_search",
+                handlers_loaded=len(all_handlers),
+                box=len(box_handlers),
+                snowflake=len(snowflake_handlers),
+                outlook=len(outlook_handlers)
+            )
+
+            all_results: List[Dict[str, Any]] = []
+            failed_handlers = []
+
+            for h in all_handlers:
+                try:
+                    results = await h.search(query=query, top=10)
+                    all_results.extend(results)
+                except Exception as e:
+                    failed_handlers.append(h.name)
+                    mcp_logger.log_warning(
+                        MCPLogger.SEARCH,
+                        "aggregated_search",
+                        f"Handler {h.name} failed",
+                        handler=h.name,
+                        error=str(e)
+                    )
+
+            mcp_logger.log_success(
+                MCPLogger.SEARCH,
+                "aggregated_search",
+                timer_key=timer_key,
+                total_results=len(all_results),
+                handlers_succeeded=len(all_handlers) - len(failed_handlers),
+                handlers_failed=len(failed_handlers),
+                failed_handlers=failed_handlers if failed_handlers else None
+            )
+
+            return {"results": all_results}
+
+        except Exception as e:
+            mcp_logger.log_failed(
+                MCPLogger.SEARCH,
+                "aggregated_search",
+                e,
+                timer_key=timer_key
+            )
+            raise
 
     @mcp.tool()
     async def fetch(id: str, ctx: Context) -> Dict[str, Any]:
         """
         Routed fetch based on id prefix:
         - 'outlook::xxxx' -> Outlook handler
+        - 'snowflake::...' -> Snowflake handler
+        - 'box::...' -> Box handler
         """
-        print("fetch get_http_request().url", get_http_request().url)
+        # Set correlation ID for this request
+        correlation_id = MCPLogger.set_correlation_id()
+
+        # Get current domain
+        current_url = get_http_request().url
+        parsed_url = urllib.parse.urlparse(str(current_url))
+        domain = parsed_url.netloc
+
+        # Validate ID format
         if not id or "::" not in id:
+            mcp_logger.log_failed(
+                MCPLogger.FETCH,
+                "aggregated_fetch",
+                ValueError("id must be in the form '<prefix>::<native_id>'"),
+                include_trace=False,
+                id=id,
+                domain=domain
+            )
             raise ValueError("id must be in the form '<prefix>::<native_id>'")
+
         prefix, native_id = id.split("::", 1)
-        
-        # Get dynamic handlers and create complete handler mapping
-        box_handlers = await get_box_handlers_for_current_domain()
-        snowflake_handlers = await get_snowflake_handlers_for_current_domain()
-        outlook_handlers = await get_outlook_handlers_for_current_domain()
-        
-        all_handlers = [
-            *box_handlers,
-            *snowflake_handlers,
-            *outlook_handlers,
-        ]
-        complete_handler_by_prefix = {h.id_prefix: h for h in all_handlers}
-        
-        handler = complete_handler_by_prefix.get(prefix)
-        if not handler:
-            raise ValueError(f"No handler registered for prefix '{prefix}::'")
+
+        timer_key = mcp_logger.log_start(
+            MCPLogger.FETCH,
+            "aggregated_fetch",
+            id=id,
+            prefix=prefix,
+            native_id=native_id,
+            domain=domain,
+            correlation_id=correlation_id
+        )
+
         try:
-            return await handler.fetch(native_id)
+            # Get dynamic handlers and create complete handler mapping
+            box_handlers = await get_box_handlers_for_current_domain()
+            snowflake_handlers = await get_snowflake_handlers_for_current_domain()
+            outlook_handlers = await get_outlook_handlers_for_current_domain()
+
+            all_handlers = [
+                *box_handlers,
+                *snowflake_handlers,
+                *outlook_handlers,
+            ]
+            complete_handler_by_prefix = {h.id_prefix: h for h in all_handlers}
+
+            mcp_logger.log_progress(
+                MCPLogger.FETCH,
+                "aggregated_fetch",
+                available_prefixes=list(complete_handler_by_prefix.keys()),
+                handlers_loaded=len(all_handlers)
+            )
+
+            handler = complete_handler_by_prefix.get(prefix)
+            if not handler:
+                error = ValueError(f"No handler registered for prefix '{prefix}::'")
+                mcp_logger.log_failed(
+                    MCPLogger.FETCH,
+                    "aggregated_fetch",
+                    error,
+                    timer_key=timer_key,
+                    include_trace=False,
+                    requested_prefix=prefix,
+                    available_prefixes=list(complete_handler_by_prefix.keys())
+                )
+                raise error
+
+            result = await handler.fetch(native_id)
+
+            mcp_logger.log_success(
+                MCPLogger.FETCH,
+                "aggregated_fetch",
+                timer_key=timer_key,
+                handler=handler.name,
+                prefix=prefix
+            )
+
+            return result
+
         except Exception as e:
-            logger.error(f"[FETCH] handler={handler.name} failed: {e}")
+            # Only log if not already logged
+            if not isinstance(e, ValueError):
+                mcp_logger.log_failed(
+                    MCPLogger.FETCH,
+                    "aggregated_fetch",
+                    e,
+                    timer_key=timer_key
+                )
             raise
     
     # ---- Health endpoint at /checks ----

@@ -3,42 +3,64 @@ from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 import logging
 import time
+from utils.mcp_logger import get_mcp_logger
 
 class BaseHandler(ABC):
     name: str
     id_prefix: str  # e.g., 'outlook'
 
     def __init__(self) -> None:
-        # Per-class logger; override if you prefer module-level loggers
+        # Use structured MCP logger
+        self.mcp_logger = get_mcp_logger(f"{self.__class__.__module__}.{self.__class__.__name__}")
+        # Keep legacy logger for backwards compatibility
         self.logger = logging.getLogger(f"{self.__class__.__module__}.{self.__class__.__name__}")
 
     # ---------- Public API with shared logging ----------
     async def search(self, query: str, top: int = 10) -> List[Dict[str, Any]]:
-        self.logger.info("[SEARCH] handler=%s query=%r top=%s", self.__class__.__name__, query, top)
-        t0 = time.monotonic()
+        """
+        Execute search operation with structured logging.
+
+        Args:
+            query: Search query string
+            top: Maximum number of results to return
+
+        Returns:
+            List of search results
+        """
+        handler_name = self.__class__.__name__
+        timer_key = self.mcp_logger.search_start(handler_name, query, top)
+
         try:
             results = await self._search_impl(query=query, top=top)
-            self.logger.info(
-                "[SEARCH] handler=%s results=%d elapsed=%.3fs",
-                self.__class__.__name__, len(results), time.monotonic() - t0
+            self.mcp_logger.search_success(
+                handler_name,
+                results_count=len(results),
+                timer_key=timer_key
             )
             return results
-        except Exception:
-            self.logger.exception("[SEARCH] handler=%s FAILED", self.__class__.__name__)
+        except Exception as e:
+            self.mcp_logger.search_failed(handler_name, e, timer_key=timer_key)
             raise
 
     async def fetch(self, native_id: str) -> Dict[str, Any]:
-        self.logger.info("[FETCH] handler=%s id=%s", self.__class__.__name__, native_id)
-        t0 = time.monotonic()
+        """
+        Execute fetch operation with structured logging.
+
+        Args:
+            native_id: Native identifier for the resource
+
+        Returns:
+            Dict containing the fetched resource
+        """
+        handler_name = self.__class__.__name__
+        timer_key = self.mcp_logger.fetch_start(handler_name, native_id)
+
         try:
             obj = await self._fetch_impl(native_id=native_id)
-            self.logger.info(
-                "[FETCH] handler=%s ok elapsed=%.3fs",
-                self.__class__.__name__, time.monotonic() - t0
-            )
+            self.mcp_logger.fetch_success(handler_name, timer_key=timer_key)
             return obj
-        except Exception:
-            self.logger.exception("[FETCH] handler=%s FAILED", self.__class__.__name__)
+        except Exception as e:
+            self.mcp_logger.fetch_failed(handler_name, e, timer_key=timer_key)
             raise
 
     # ---------- Implementation hooks for subclasses ----------
