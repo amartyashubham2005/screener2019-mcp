@@ -55,7 +55,7 @@ Azure Active Directory (Azure AD) Single Sign-On (SSO) has been successfully imp
   ```bash
   VITE_AZURE_CLIENT_ID=731e44f2-dc31-4802-88cf-3bec822882bc
   VITE_AZURE_TENANT_ID=fd95fe1a-1798-4386-b8b9-882505eccaff
-  VITE_AZURE_REDIRECT_URI=https://jesterbot.com/auth/callback
+  VITE_AZURE_REDIRECT_URI=https://app.jesterbot.com/auth/callback
   ```
 
 #### 2. Auth Service Updates
@@ -100,7 +100,7 @@ Azure Active Directory (Azure AD) Single Sign-On (SSO) has been successfully imp
    - Microsoft validates credentials and requests user consent
 
 3. **Azure AD Redirects Back to Application**
-   - Azure AD redirects to: `https://jesterbot.com/auth/callback?code=xxx&state=yyy`
+   - Azure AD redirects to: `https://app.jesterbot.com/auth/callback?code=xxx&state=yyy`
    - Frontend callback page extracts code and state from URL
 
 4. **Backend Processes Callback**
@@ -127,7 +127,7 @@ The deployment scripts automatically created an Azure AD app registration with t
 
 ### Redirect URIs
 - **Backend**: `https://api.jesterbot.com/api/v1/auth/azure/callback`
-- **Frontend**: `https://jesterbot.com/auth/callback`
+- **Frontend**: `https://app.jesterbot.com/auth/callback`
 
 ### API Permissions (Microsoft Graph - Delegated)
 - `User.Read`: Read user profile
@@ -156,7 +156,7 @@ Already configured in `mcp-admin-ui/.env`:
 ```bash
 VITE_AZURE_CLIENT_ID=731e44f2-dc31-4802-88cf-3bec822882bc
 VITE_AZURE_TENANT_ID=fd95fe1a-1798-4386-b8b9-882505eccaff
-VITE_AZURE_REDIRECT_URI=https://jesterbot.com/auth/callback
+VITE_AZURE_REDIRECT_URI=https://app.jesterbot.com/auth/callback
 ```
 
 ## Deployment Steps
@@ -203,11 +203,11 @@ GitHub Actions will automatically deploy to Azure Static Web Apps.
 
 ### 1. Test Azure AD Login Flow
 
-1. Navigate to `https://jesterbot.com/signin`
+1. Navigate to `https://app.jesterbot.com/signin`
 2. Click "Sign in with Microsoft"
 3. You should be redirected to Microsoft's login page
 4. Enter your Microsoft credentials
-5. After successful authentication, you should be redirected back to `https://jesterbot.com/auth/callback`
+5. After successful authentication, you should be redirected back to `https://app.jesterbot.com/auth/callback`
 6. The callback page should process the authentication and redirect you to `/sources`
 
 ### 2. Verify User Creation
@@ -225,7 +225,7 @@ WHERE auth_provider = 'azure';
 After logging in, check that the JWT token is set in cookies:
 - Open browser DevTools → Application → Cookies
 - Look for `access_token` cookie
-- Domain should be `jesterbot.com`
+- Domain should be `app.jesterbot.com`
 - Should be HTTP-only and Secure
 
 ## Security Features
@@ -276,7 +276,7 @@ If a user already has an account with email/password authentication and then sig
        │
        ↓
 ┌─────────────────────────────────────────────────────────┐
-│                Frontend (jesterbot.com)                  │
+│                Frontend (app.jesterbot.com)              │
 │  - Calls GET /api/v1/auth/azure/login                   │
 │  - Redirects to Azure AD                                │
 └──────────────────────────┬──────────────────────────────┘

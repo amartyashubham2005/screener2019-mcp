@@ -105,13 +105,13 @@ The configuration file can be found at:
 /etc/nginx/sites-available/default
 ```
 
-Relevant configuration for `jesterbot.com`:
+Relevant configuration for `app.jesterbot.com`:
 
 ```
 root /home/ankit/workspace/screener2019-mcp-admin-ui/dist;
 
 index index.html index.htm index.nginx-debian.html;
-server_name jesterbot.com; # managed by Certbot
+server_name app.jesterbot.com; # managed by Certbot
 
 location / {
     try_files $uri $uri/ /index.html;
@@ -124,7 +124,7 @@ location / {
   After running `npm run build`, there is no need to restart Nginx.
   The new static files will automatically be served from the `dist/` folder.
 
-* **Domain:** The UI is accessible at [https://jesterbot.com](https://jesterbot.com).
+* **Domain:** The UI is accessible at [https://app.jesterbot.com](https://app.jesterbot.com).
 
 ## Summary of Commands
 

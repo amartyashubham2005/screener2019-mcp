@@ -35,7 +35,7 @@ az ad app update \
   --id 731e44f2-dc31-4802-88cf-3bec822882bc \
   --web-redirect-uris \
     "https://api.jesterbot.com/api/v1/auth/azure/callback" \
-    "https://jesterbot.com/auth/callback" \
+    "https://app.jesterbot.com/auth/callback" \
     "https://skylark-climbing-hermit.ngrok-free.app/api/v1/auth/azure/callback" \
     "http://localhost:5173/auth/callback"
 ```

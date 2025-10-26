@@ -75,7 +75,7 @@ Should contain:
 ```
 VITE_AZURE_CLIENT_ID=731e44f2-dc31-4802-88cf-3bec822882bc
 VITE_AZURE_TENANT_ID=fd95fe1a-1798-4386-b8b9-882505eccaff
-VITE_AZURE_REDIRECT_URI=https://jesterbot.com/auth/callback
+VITE_AZURE_REDIRECT_URI=https://app.jesterbot.com/auth/callback
 ```
 
 ### 2. Build and Deploy Frontend
@@ -91,14 +91,14 @@ git push origin main
 ### 3. Verify Frontend Deployment
 
 Open browser and check:
-- Navigate to: https://jesterbot.com/signin
+- Navigate to: https://app.jesterbot.com/signin
 - "Sign in with Microsoft" button should be visible
 - Button should have Microsoft logo (4-colored square)
 
 ## Testing Checklist
 
 ### Test 1: Azure AD Login Initiation
-- [ ] Navigate to https://jesterbot.com/signin
+- [ ] Navigate to https://app.jesterbot.com/signin
 - [ ] Click "Sign in with Microsoft"
 - [ ] Should redirect to Microsoft login page
 - [ ] URL should start with `https://login.microsoftonline.com`
@@ -110,10 +110,10 @@ Open browser and check:
 - [ ] Click "Accept" on consent screen
 
 ### Test 3: Callback Processing
-- [ ] Should redirect to https://jesterbot.com/auth/callback
+- [ ] Should redirect to https://app.jesterbot.com/auth/callback
 - [ ] Should see loading spinner briefly
 - [ ] Should show success checkmark
-- [ ] Should redirect to https://jesterbot.com/sources
+- [ ] Should redirect to https://app.jesterbot.com/sources
 
 ### Test 4: User Session
 - [ ] Dashboard should load successfully
@@ -140,7 +140,7 @@ Expected result:
 ### Test 6: JWT Token Verification
 - [ ] Open browser DevTools → Application → Cookies
 - [ ] Find cookie named `access_token`
-- [ ] Domain: `jesterbot.com` or `.jesterbot.com`
+- [ ] Domain: `app.jesterbot.com` or `.jesterbot.com`
 - [ ] HttpOnly: Yes
 - [ ] Secure: Yes
 - [ ] SameSite: Lax

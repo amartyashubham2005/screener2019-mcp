@@ -23,7 +23,7 @@ APP_NAME="screener2019-mcp-sso-dev"
 
 # Redirect URIs
 PROD_BACKEND_URI="https://api.jesterbot.com/api/v1/auth/azure/callback"
-PROD_FRONTEND_URI="https://jesterbot.com/auth/callback"
+PROD_FRONTEND_URI="https://app.jesterbot.com/auth/callback"
 LOCAL_BACKEND_URI="https://skylark-climbing-hermit.ngrok-free.app/api/v1/auth/azure/callback"
 LOCAL_FRONTEND_URI="http://localhost:5173/auth/callback"
 

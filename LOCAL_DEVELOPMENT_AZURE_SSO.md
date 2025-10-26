@@ -32,7 +32,7 @@ az ad app update \
   --id 731e44f2-dc31-4802-88cf-3bec822882bc \
   --web-redirect-uris \
     "https://api.jesterbot.com/api/v1/auth/azure/callback" \
-    "https://jesterbot.com/auth/callback" \
+    "https://app.jesterbot.com/auth/callback" \
     "https://skylark-climbing-hermit.ngrok-free.app/api/v1/auth/azure/callback" \
     "http://localhost:5173/auth/callback"
 ```
@@ -78,7 +78,7 @@ Your redirect URIs should now show:
 
 ✅ **Production URIs** (already configured):
 - `https://api.jesterbot.com/api/v1/auth/azure/callback`
-- `https://jesterbot.com/auth/callback`
+- `https://app.jesterbot.com/auth/callback`
 
 ✅ **Development URIs** (newly added):
 - `https://skylark-climbing-hermit.ngrok-free.app/api/v1/auth/azure/callback`
@@ -92,7 +92,7 @@ Platform configurations
 Web
   Redirect URIs
     • https://api.jesterbot.com/api/v1/auth/azure/callback
-    • https://jesterbot.com/auth/callback
+    • https://app.jesterbot.com/auth/callback
     • https://skylark-climbing-hermit.ngrok-free.app/api/v1/auth/azure/callback
     • http://localhost:5173/auth/callback
 ```
@@ -116,7 +116,7 @@ Web
      --id 731e44f2-dc31-4802-88cf-3bec822882bc \
      --web-redirect-uris \
        "https://api.jesterbot.com/api/v1/auth/azure/callback" \
-       "https://jesterbot.com/auth/callback" \
+       "https://app.jesterbot.com/auth/callback" \
        "https://YOUR-NEW-NGROK-URL.ngrok-free.app/api/v1/auth/azure/callback" \
        "http://localhost:5173/auth/callback"
    ```
@@ -225,7 +225,7 @@ allowed_origins = [
     "http://localhost:3000",
     "http://localhost:5173",  # ✅ Your Vite dev server
     "http://localhost:8080",
-    "https://jesterbot.com"
+    "https://app.jesterbot.com"
 ]
 ```
 
@@ -286,7 +286,7 @@ AZURE_REDIRECT_URI='https://api.jesterbot.com/api/v1/auth/azure/callback'
 **Frontend `.env`:**
 ```bash
 VITE_API_BASE_URL=https://api.jesterbot.com
-VITE_AZURE_REDIRECT_URI=https://jesterbot.com/auth/callback
+VITE_AZURE_REDIRECT_URI=https://app.jesterbot.com/auth/callback
 ```
 
 **Note**: You can use different `.env` files:
@@ -317,7 +317,7 @@ If you want to test with HTTPS for frontend as well:
      --id 731e44f2-dc31-4802-88cf-3bec822882bc \
      --web-redirect-uris \
        "https://api.jesterbot.com/api/v1/auth/azure/callback" \
-       "https://jesterbot.com/auth/callback" \
+       "https://app.jesterbot.com/auth/callback" \
        "https://skylark-climbing-hermit.ngrok-free.app/api/v1/auth/azure/callback" \
        "https://abc123.ngrok-free.app/auth/callback"
    ```
@@ -334,7 +334,7 @@ az ad app update \
   --id 731e44f2-dc31-4802-88cf-3bec822882bc \
   --web-redirect-uris \
     "https://api.jesterbot.com/api/v1/auth/azure/callback" \
-    "https://jesterbot.com/auth/callback" \
+    "https://app.jesterbot.com/auth/callback" \
     "https://skylark-climbing-hermit.ngrok-free.app/api/v1/auth/azure/callback" \
     "http://localhost:5173/auth/callback"
 ```

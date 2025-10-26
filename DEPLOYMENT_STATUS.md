@@ -28,7 +28,7 @@
 
 ### Target Custom Domains
 - **Backend API:** https://api.jesterbot.com
-- **Frontend:** https://jesterbot.com
+- **Frontend:** https://app.jesterbot.com
 
 ---
 
@@ -94,10 +94,10 @@ Value: screener2019-mcp-dev-backend.azurewebsites.net
 TTL: 3600
 ```
 
-#### Frontend (jesterbot.com)
+#### Frontend (app.jesterbot.com)
 ```
 Type: CNAME
-Name: @ (or www)
+Name: app
 Value: salmon-island-0c1c66710.3.azurestaticapps.net
 TTL: 3600
 ```
@@ -128,7 +128,7 @@ az webapp config ssl bind \
 2. Navigate to: Static Web Apps → screener2019-mcp-dev-frontend
 3. Click "Custom domains"
 4. Click "Add"
-5. Enter: jesterbot.com
+5. Enter: app.jesterbot.com
 6. Follow validation steps
 7. SSL certificate will be automatically provisioned
 
@@ -178,7 +178,7 @@ Update allowed origins in `mcp-server-python/main.py`:
 allowed_origins = [
     "http://localhost:3000",
     "http://localhost:5173",
-    "https://jesterbot.com",
+    "https://app.jesterbot.com",
     "https://www.jesterbot.com",
     "https://salmon-island-0c1c66710.3.azurestaticapps.net",
 ]

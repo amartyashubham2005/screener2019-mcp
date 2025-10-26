@@ -95,7 +95,7 @@ response.set_cookie(
 
 **Why?**
 - Production has both frontend and backend on HTTPS
-- Production has same-site (both on `jesterbot.com` domain)
+- Production has same-site (both on `jesterbot.com` domain - api.jesterbot.com and app.jesterbot.com)
 - `SameSite=Lax` provides better CSRF protection
 - `Secure=True` ensures cookies only sent over HTTPS
 
